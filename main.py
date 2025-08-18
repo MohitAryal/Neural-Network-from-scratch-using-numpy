@@ -3,21 +3,23 @@ import numpy as np
 
 def sigmoid(x):
     '''Returns the sigmoid of given input array'''
+    x = np.clip(x, -500, 500)
     sig = 1 / (1 + np.exp(-x))
     return sig
 
 
-def sigmoid_der(sig):
+def sigmoid_der(x):
     '''Returns the derivative input(which is the output of the sigmoid function)'''
-    der = sig * (1 - sig)
+    y = sigmoid(x)
+    der = y * (1 - y)
     return der
 
 
 def wt_init(input_size, hidden_layer_size, output_size):
     '''Initializes the weights and biases of the network.'''
-    w1 = np.random.randn(input_size, hidden_layer_size) * np.sqrt(2 / hidden_layer_size)
+    w1 = np.random.randn(input_size, hidden_layer_size) * np.sqrt(2 / (input_size + hidden_layer_size))
     b1 = np.zeros((1 , hidden_layer_size))
-    w2 = np.random.randn(hidden_layer_size, output_size) * np.sqrt(2 / output_size)
+    w2 = np.random.randn(hidden_layer_size, output_size) * np.sqrt(2 / (hidden_layer_size + output_size))
     b2 = np.zeros((1, output_size))
     return w1, b1, w2, b2
 
@@ -27,7 +29,7 @@ def loss(y, y_pred):
     eps = 1e-7
     y_pred_clipped = np.clip(y_pred, eps , 1.0-eps)
     cross_entropy_loss = - y * np.log(y_pred_clipped) - (1 - y) * np.log(1 - y_pred_clipped)
-    return cross_entropy_loss
+    return np.mean(cross_entropy_loss)
 
 
 def forward_propagation(w1, b1, w2, b2, X):
@@ -49,9 +51,9 @@ def back_prop(w1, b1, w2, b2, lr, X, y, a1, a2):
     db2 = np.sum(dz2, axis=0, keepdims=True) / m
 
     # hidden layer gradients
-    da1 = w2 @ dz2.T
-    dz1 = da1 @ sigmoid_der(X @ w1 + b1)
-    dw1 = X @ dz1.T /m
+    da1 = dz2 @ w2.T
+    dz1 = da1 * sigmoid_der(X @ w1 + b1)
+    dw1 = X.T @ dz1 /m
     db1 = np.sum(dz1, axis=0, keepdims=True) / m
     
     w1 -= lr * dw1
@@ -69,8 +71,8 @@ def train(X, y, lr, epoch, input_size, hidden_layer_size, output_size):
         error = loss(y, a2)
         losses.append(error)
         w1, b1, w2, b2 = back_prop(w1, b1, w2, b2, lr, X, y, a1, a2)
-        if i % 20 == 0:
-            print(f'At iteration {i}, loss = {loss}')
+        if i % 100 == 0:
+            print(f'At iteration {i}, loss = {error}')
     return w1, b1, w2, b2
 
 def generate_xor_data(n_samples=1000, noise=0.1, seed=42):
@@ -91,8 +93,38 @@ split_idx = int(0.8 * len(X))  # 80% train, 20% test
 X_train, X_test = X[:split_idx], X[split_idx:]
 y_train, y_test = y[:split_idx], y[split_idx:]
 
-learned_w1, learned_b1, learned_w2, learned_b2 = train(X_train, y_train, lr=0.01, epoch=200, input_size = 2, hidden_layer_size = 3, output_size=1)
-_, predicted_output = forward_propagation(learned_w1, learned_b1, learned_w2, learned_b2, X_test)
+
+def generate_clean_xor_data(n_samples=500, seed=None):
+    if seed is not None:
+        np.random.seed(seed)
+
+    # Base XOR inputs and labels
+    base_inputs = np.array([[0, 0],
+                            [0, 1],
+                            [1, 0],
+                            [1, 1]], dtype=np.float32)
+    base_labels = np.array([0, 1, 1, 0], dtype=np.int64)  # XOR: 0^0=0, 0^1=1, etc.
+
+    # Repeat the 4 XOR points to get n_samples total
+    reps = n_samples // 4
+    remainder = n_samples % 4
+
+    X = np.tile(base_inputs, (reps, 1))
+    y = np.tile(base_labels, reps)
+
+    # Add remaining samples (to reach exact n_samples)
+    if remainder > 0:
+        X = np.vstack([X, base_inputs[:remainder]])
+        y = np.concatenate([y, base_labels[:remainder]])
+
+    return X, y
+
+X_te, y_te = generate_clean_xor_data(seed=45)
+
+
+learned_w1, learned_b1, learned_w2, learned_b2 = train(X_train, y_train, lr=0.1, epoch=7000, input_size = 2, hidden_layer_size = 14, output_size=1)
+_a, predicted_output = forward_propagation(learned_w1, learned_b1, learned_w2, learned_b2, X_test)
+
 predicted_classes = (predicted_output > 0.5).astype(int)
-loss = np.mean(predicted_classes == y_test)
-print(loss)
+accuracy = np.mean((predicted_classes == y_test))
+print(np.mean(accuracy))
