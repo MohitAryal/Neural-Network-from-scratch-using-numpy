@@ -80,8 +80,8 @@ Two datasets are generated:
 
 1. Clone the repo:
    ```bash
-   git clone https://github.com/MohitAryal/xor-numpy-net.git
-   cd xor-numpy-net
+   git clone https://github.com/MohitAryal/Neural-Network-from-scratch-using-numpy.git
+   cd Neural-Network-from-scratch-using-numpy
    ```
 
 2. Run training:
