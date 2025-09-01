@@ -1,5 +1,5 @@
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 def sigmoid(x):
     '''Returns the sigmoid of given input array'''
@@ -17,9 +17,9 @@ def sigmoid_der(x):
 
 def wt_init(input_size, hidden_layer_size, output_size):
     '''Initializes the weights and biases of the network.'''
-    w1 = np.random.randn(input_size, hidden_layer_size) * np.sqrt(2 / (input_size + hidden_layer_size))
+    w1 = np.random.randn(input_size, hidden_layer_size) * (2 / (input_size + hidden_layer_size))
     b1 = np.zeros((1 , hidden_layer_size))
-    w2 = np.random.randn(hidden_layer_size, output_size) * np.sqrt(2 / (hidden_layer_size + output_size))
+    w2 = np.random.randn(hidden_layer_size, output_size) * (2 / (hidden_layer_size + output_size))
     b2 = np.zeros((1, output_size))
     return w1, b1, w2, b2
 
@@ -43,6 +43,7 @@ def forward_propagation(w1, b1, w2, b2, X):
 
 
 def back_prop(w1, b1, w2, b2, lr, X, y, a1, a2):
+    '''Performs back propagation and updates the weights and biases accordingly'''
     m = y.shape[0]
     
     # output layer gradients
@@ -55,7 +56,8 @@ def back_prop(w1, b1, w2, b2, lr, X, y, a1, a2):
     dz1 = da1 * sigmoid_der(X @ w1 + b1)
     dw1 = X.T @ dz1 /m
     db1 = np.sum(dz1, axis=0, keepdims=True) / m
-    
+
+    # update weights
     w1 -= lr * dw1
     b1 -= lr * db1
     w2 -= lr * dw2
@@ -64,18 +66,20 @@ def back_prop(w1, b1, w2, b2, lr, X, y, a1, a2):
 
 
 def train(X, y, lr, epoch, input_size, hidden_layer_size, output_size):
+    '''Trains the model to learn weights and biases by minimizing loss on training data'''
     w1, b1, w2, b2 = wt_init(input_size, hidden_layer_size, output_size)
     losses = []
-    for i in range(epoch):
+    for i in range(epoch + 1):
         a1, a2 = forward_propagation(w1, b1, w2, b2, X)
         error = loss(y, a2)
         losses.append(error)
         w1, b1, w2, b2 = back_prop(w1, b1, w2, b2, lr, X, y, a1, a2)
-        if i % 100 == 0:
+        if i % 500 == 0:
             print(f'At iteration {i}, loss = {error}')
-    return w1, b1, w2, b2
+    return w1, b1, w2, b2, losses
 
 def generate_xor_data(n_samples=1000, noise=0.1, seed=42):
+    '''Generates noise added xor dataset'''
     np.random.seed(seed)
     X = np.random.randint(0, 2, (n_samples, 2))
     y = np.logical_xor(X[:, 0], X[:, 1]).astype(int).reshape(-1, 1)
@@ -84,20 +88,13 @@ def generate_xor_data(n_samples=1000, noise=0.1, seed=42):
     X = X + noise * np.random.randn(n_samples, 2)
     return X, y
 
-# Generate dataset
-X, y = generate_xor_data(n_samples=1000, noise=0.1)
-
-# Shuffle and split into train/test
-split_idx = int(0.8 * len(X))  # 80% train, 20% test
-
-X_train, X_test = X[:split_idx], X[split_idx:]
-y_train, y_test = y[:split_idx], y[split_idx:]
+# Generate training dataset
+X_train, y_train = generate_xor_data(n_samples=1000, noise=0.01)
 
 
-def generate_clean_xor_data(n_samples=500, seed=None):
-    if seed is not None:
-        np.random.seed(seed)
-
+def generate_clean_xor_data(n_samples=500, seed=45):
+    ''' Generates xor dataset without noise'''
+    np.random.seed(seed)
     # Base XOR inputs and labels
     base_inputs = np.array([[0, 0],
                             [0, 1],
@@ -119,12 +116,14 @@ def generate_clean_xor_data(n_samples=500, seed=None):
 
     return X, y
 
-X_te, y_te = generate_clean_xor_data(seed=45)
+# Generate testing dataset
+X_test, y_test = generate_clean_xor_data(seed=45)
 
+# Train the model
+learned_w1, learned_b1, learned_w2, learned_b2, losses = train(X_train, y_train, lr=0.5, epoch=4000, input_size = 2, hidden_layer_size = 14, output_size=1)
 
-learned_w1, learned_b1, learned_w2, learned_b2 = train(X_train, y_train, lr=0.1, epoch=7000, input_size = 2, hidden_layer_size = 14, output_size=1)
+# Evaluate on the test set
 _a, predicted_output = forward_propagation(learned_w1, learned_b1, learned_w2, learned_b2, X_test)
-
 predicted_classes = (predicted_output > 0.5).astype(int)
-accuracy = np.mean((predicted_classes == y_test))
+accuracy = np.mean((predicted_classes.flatten() == y_test))
 print(np.mean(accuracy))
